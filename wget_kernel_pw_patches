@@ -1,0 +1,51 @@
+#!/bin/bash
+export CDirectory=$(pwd)
+export Patch_Folder=$CDirectory/Patches
+export List_Folder=$CDirectory/Lists
+
+export Project_ID=EMPTY
+export Project_Description=EMPTY
+
+if [ ! -e ~/.pwclientrc ]; then
+  cp $CDirectory/pwclientrc ~/.pwclientrc
+fi
+
+if [ -e $List_Folder/2.lst ]; then 
+  rm $List_Folder/*.lst
+fi
+rm -R $Patch_Folder
+mkdir $Patch_Folder
+
+rm -R -r $List_Folder
+mkdir $List_Folder
+
+for i in 2,linux-acpi 62,linux-arm-kernel 92,linux-arm-msm 251,linux-audit \
+	   241,linux-block 19,linux-btrfs 331,linux-clk 151,linux-crypto 111,linux-dmaengine \
+	   51,linux-fbdev 345,linux-fpga 353,linux-fscrypt 201,linux-fsdevel 311,linux-hwmon 17,linux-input \
+	   5,linux-kbuild 4,linux-media 32,linux-mmc 321,linux-modules 41,linux-nfs 12,linux-pci 61,linux-pm \
+	   18,linux-rdma 341,linux-remoteproc 211,linux-scsi 333,linux-security-module 15,linux-wireless 271,linux-wpan 
+do
+Project_ID=$(echo $i | cut -d "," -f 1)
+Project_Description=$(echo $i | cut -d "," -f 2)
+Patch_Description=EMPTY
+
+   $CDirectory/pwclient list $Project_ID -f %{id} > $List_Folder/$Project_ID.lst
+
+   if [ -s $List_Folder/$Project_ID.lst ]; then
+    if [ ! -d $Patch_Folder/$Project_Description ]; then
+      mkdir -p $Patch_Folder/$Project_Description
+      echo "Creating folder: $Patch_Folder/$Project_Description"    
+    fi
+    cd $Patch_Folder/$Project_Description
+    echo "Changing path to : $Patch_Folder/$Project_ID"
+    echo ".........................................."
+    echo "Project Description: $Project_Description, Project ID: $Project_ID"
+    while IFS='' read -r line || [[ -n "$line" ]]; do
+	Patch_Description=$(wget --server-response -q -O - "https://patchwork.kernel.org/patch/$line/raw/" 2>&1 | grep "Content-Disposition:" | tail -1 | awk 'match($0, /filename=(.+)/, f){ print f[1] }')
+	echo "Patch Description: $Patch_Description, Patch ID: $line"
+ 	wget -q --content-disposition https://patchwork.kernel.org/patch/$line/raw/
+    done < "$List_Folder/$Project_ID.lst"
+   else
+    rm $List_Folder/$Project_ID.lst
+   fi
+done
